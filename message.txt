@@ -1,0 +1,86 @@
+📋 Especificação, Gestão com Issues e SDLC no GitHub
+Data de conclusão 7 de novembro de 2026 às 23:59
+•
+Vários envios permitidos
+Instruções
+Entrega: Link completo do repositório do projeto no GitHub (exemplo: https://github.com/seu-usuario/seu-projeto)
+
+⚠️ Atenção: Envie o link específico do repositório do projeto, e não o link geral do seu perfil pessoal no GitHub.
+
+🎯 Objetivo da Atividade
+Nesta atividade prática individual, você irá estruturar um projeto de software desde a sua concepção documental até a engenharia de fluxo de trabalho no GitHub.
+
+O objetivo é exercitar a disciplina de especificação e rastreabilidade: transformar ideias em requisitos formais, desdobrá-los em backlog de engenharia (Issues) e executar implementações guiadas por boas práticas de versionamento profissional (Git Flow, Commits Atômicos e Versionamento Semântico).
+
+Escolha uma ideia de software simples e enxuta (por exemplo: um gerenciador de hábitos, API de catálogo de livros, mini-gerenciador de tarefas, controle de finanças pessoais, sistema de agendamento simples, etc.) com escopo realista para ser desenvolvido e refinado ao longo desta semana.
+
+📦 Estrutura Obrigatória do Repositório
+O repositório do seu projeto deve conter a seguinte estrutura de pastas e arquivos:
+
+   seu-projeto/
+    ├── docs/
+    │   ├── project-charter.md           # Termo de Abertura do Projeto
+    │   ├── requisitos.md                # Requisitos Funcionais (RF) e Não Funcionais (RNF)
+    │   ├── casos-de-uso.md              # Especificação de Casos de Uso
+    │   ├── user-stories.md              # Histórias de Usuário com Critérios de Aceite
+    │   └── ...                          # Outros diagramas/especificações que julgar necessários
+    ├── src/                             # Código-fonte da aplicação
+    ├── .gitignore                       # Ignorando dependências e temporários
+    └── README.md                        # Documentação principal e guia do projeto
+📝 1. Documentação de Planejamento (Pasta docs/)
+Na pasta docs/, produza e armazene os seguintes artefatos em formato Markdown:
+
+Project Charter (Termo de Abertura):
+
+Justificativa e visão geral do produto.
+Objetivos SMART do software.
+Escopo preliminar (o que está dentro e o que está expressamente fora do escopo desta semana).
+Stakeholders e público-alvo.
+Requisitos Funcionais (RF) e Não Funcionais (RNF):
+
+Lista numerada e rastreável de RFs (ex.: [RF01] O sistema deve permitir cadastrar...).
+Lista numerada de RNFs (ex.: desempenho, persistência, usabilidade, segurança, portabilidade).
+Casos de Uso (Use Cases):
+
+Descrição dos atores envolvidos.
+Fluxos principais, alternativos e de exceção para as operações centrais do sistema.
+User Stories (Histórias de Usuário):
+
+Redigidas no padrão canônico: "Como [ator], quero [ação] para que [valor de negócio]".
+Critérios de Aceite explícitos para cada história (formato BDD/Gherkin recomendado: Dado... Quando... Então...).
+Documentos Complementares de Engenharia (Opcional, porém valorizado):
+
+Diagrama de classes, modelo entidade-relacionamento (DER), diagramas arquiteturais (C4 Model) ou rascunhos de interface/wireframes.
+📄 2. README.md Detalhado e Sincronizado
+A raiz do repositório deve ter um README.md exemplar, contendo:
+
+Título do projeto e descrição clara do problema resolvido.
+Badges informativas (versão atual, licença, status de build/testes).
+Sumário de funcionalidades já implementadas versus planejadas.
+Instruções passo a passo para configuração de ambiente, instalação e execução local.
+Links diretos referenciando cada um dos documentos da pasta docs/.
+Tabela ou diagrama do fluxo de branches adotado.
+⚙️ 3. Backlog no GitHub: Criação de 15 Issues e Workflow de Execução
+A documentação gerada deve obrigatoriamente alimentar o backlog prático do repositório:
+
+Criação Inicial de 15 Issues:
+
+Cadastre no mínimo 15 Issues no GitHub Issues do seu repositório, mapeando tanto itens de configuração e documentação quanto funcionalidades extraídas dos requisitos e histórias de usuário.
+Use labels (ex.: documentation, feature, bug, refactor, enhancement) e vincule os critérios de aceite na descrição de cada issue.
+Fluxo de Trabalho de Engenharia (A cada Issue resolvida):
+
+Git Flow: Nunca faça commit direto na branch principal de produção (main). Trabalhe com branch de desenvolvimento (develop) e crie branches temáticas para cada issue (ex.: feature/issue-01-setup-projeto, feature/issue-05-cadastro-tarefa).
+Commits Atômicos: Faça commits pequenos, frequentes e autossuficientes. Aplique o padrão Conventional Commits (ex.: feat(auth): implementar login com JWT (#3) ou docs(rf): detalhar requisitos não funcionais (#2)).
+Versionamento Semântico (SemVer): Crie tags de versão git anotadas (ex.: v0.1.0, v0.2.0) marcando marcos estáveis (milestones) da evolução da sua aplicação.
+Rastreabilidade e Fechamento: Ao abrir o Pull Request ou finalizar a branch, faça referência à issue correspondente (ex.: Closes #5) para manter o ciclo rastreável.
+🚀 Bonificação: Feedback Antecipado (Early Submission)
+💡 Incentivo de Entrega Antecipada:
+Os estudantes que realizarem a submissão prévia do repositório antes da nossa próxima aula presencial receberão feedback formativo individualizado sobre o andamento da arquitetura, documentação e organização de issues.
+
+Na próxima aula, iremos avançar na finalização da implementação do software, discutir os pipelines de automação, ferramentas de qualidade de código e lições aprendidas sobre o workflow adotado.
+
+📥 Instruções de Envio
+Envie como resposta desta tarefa no Teams:
+
+URL do Repositório no GitHub: (ex.: https://github.com/fulano-senac/gerenciador-habitos)
+Breve resumo (1 a 2 parágrafos): Descrevendo a ideia do software escolhido e a stack tecnológica selecionada.
