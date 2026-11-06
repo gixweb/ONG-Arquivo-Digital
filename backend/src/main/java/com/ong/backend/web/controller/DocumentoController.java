@@ -2,15 +2,18 @@ package com.ong.backend.web.controller;
 
 import com.ong.backend.application.port.in.*;
 import com.ong.backend.domain.model.Documento;
+import com.ong.backend.domain.model.PaginatedResult;
 import com.ong.backend.domain.model.VersaoDocumento;
 import com.ong.backend.web.dto.*;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -23,17 +26,20 @@ public class DocumentoController {
     private final RegistrarNovaVersaoUseCase registrarNovaVersaoUseCase;
     private final ArquivarDocumentoUseCase arquivarDocumentoUseCase;
     private final ConsultarHistoricoVersoesUseCase consultarHistoricoVersoesUseCase;
+    private final BuscarDocumentosComFiltroUseCase buscarDocumentosComFiltroUseCase;
 
     public DocumentoController(CriarDocumentoUseCase criarDocumentoUseCase,
                                BuscarDocumentoPorIdUseCase buscarDocumentoPorIdUseCase,
                                RegistrarNovaVersaoUseCase registrarNovaVersaoUseCase,
                                ArquivarDocumentoUseCase arquivarDocumentoUseCase,
-                               ConsultarHistoricoVersoesUseCase consultarHistoricoVersoesUseCase) {
+                               ConsultarHistoricoVersoesUseCase consultarHistoricoVersoesUseCase,
+                               BuscarDocumentosComFiltroUseCase buscarDocumentosComFiltroUseCase) {
         this.criarDocumentoUseCase = criarDocumentoUseCase;
         this.buscarDocumentoPorIdUseCase = buscarDocumentoPorIdUseCase;
         this.registrarNovaVersaoUseCase = registrarNovaVersaoUseCase;
         this.arquivarDocumentoUseCase = arquivarDocumentoUseCase;
         this.consultarHistoricoVersoesUseCase = consultarHistoricoVersoesUseCase;
+        this.buscarDocumentosComFiltroUseCase = buscarDocumentosComFiltroUseCase;
     }
 
     @PostMapping
@@ -54,6 +60,30 @@ public class DocumentoController {
                 .toUri();
 
         return ResponseEntity.created(location).body(DocumentoResponse.fromDomain(criado));
+    }
+
+    @GetMapping
+    public ResponseEntity<PaginatedResponse<DocumentoResponse>> listarComFiltros(
+            @RequestParam(required = false) String tipo,
+            @RequestParam(name = "data_inicio", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+            @RequestParam(name = "data_fim", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim,
+            @RequestParam(required = false) String titulo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        BuscarDocumentosFiltroQuery query = new BuscarDocumentosFiltroQuery(
+                tipo,
+                dataInicio,
+                dataFim,
+                titulo,
+                page,
+                size
+        );
+
+        PaginatedResult<Documento> resultado = buscarDocumentosComFiltroUseCase.buscarComFiltros(query);
+        PaginatedResponse<DocumentoResponse> response = PaginatedResponse.fromDomain(resultado, DocumentoResponse::fromDomain);
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
