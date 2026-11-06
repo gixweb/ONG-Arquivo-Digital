@@ -62,7 +62,7 @@ flowchart TD
     end
     
     subgraph Database ["Persistência Relacional"]
-        Postgres[("PostgreSQL 16\nTabelas: documentos e versoes")]
+        Postgres[("PostgreSQL 16 / H2 Compatível\nTabelas: documentos e versoes")]
     end
     
     User -->|HTTP / Navegador| SPA
@@ -115,11 +115,14 @@ ONG-AD/
 │       │   └── web/               # Controllers REST e GlobalExceptionHandler (RFC 7807)
 │       └── main/resources/
 │           ├── db/migration/      # Migrações relacionais Flyway (V1)
-│           └── application.properties
+│           ├── application.properties      # Ativa perfil dev por padrão
+│           ├── application-dev.properties  # H2 em modo PostgreSQL (zero dependências)
+│           └── application-prod.properties # PostgreSQL 16
 ├── frontend/                      # Console Web SPA (Folder-Split)
 │   ├── index.html                 # Interface administrativa da secretaria
 │   ├── css/style.css              # Design responsivo e estados visuais
 │   └── js/app.js                  # Integração assíncrona REST
+├── docker-compose.yml             # Subida do PostgreSQL 16 com um comando
 ├── CHANGELOG.md                   # Histórico de releases no padrão Keep a Changelog
 ├── LICENSE                        # Licença MIT
 └── README.md                      # Documentação central do projeto
@@ -144,33 +147,47 @@ Acesse a documentação formal e rastreável nos links diretos abaixo:
 ## 6. Instruções de Configuração e Execução
 
 ### 6.1 Pré-requisitos
-* **Java Development Kit (JDK):** Versão 21 ou superior instalada.
-* **Maven:** Incluso via wrapper (`./mvnw` ou `mvnw.cmd`).
-* **PostgreSQL:** Versão 16 (ou container Docker equivalente). Para execução rápida de testes, o perfil de teste utiliza banco H2 em memória.
+* **Java Development Kit (JDK):** Versão 21 instalada.
+* **Maven Wrapper:** Já incluso no projeto (`mvnw.cmd` / `./mvnw`).
 
 ### 6.2 Executando o Backend
-```bash
-# 1. Navegue até o diretório do backend
+
+#### Opção A: Execução Imediata (Perfil `dev` — Padrão)
+Não requer instalação nem configuração de PostgreSQL. O sistema inicia com banco em memória H2 em modo de compatibilidade estrita PostgreSQL, executando as migrações Flyway automaticamente:
+```powershell
 cd backend
-
-# 2. Compile e execute a suíte completa de testes automatizados (80 testes)
-./mvnw clean test
-
-# 3. Inicie o servidor da aplicação
-./mvnw spring-boot:run
+.\mvnw.cmd spring-boot:run
 ```
-A API REST estará operacional em: `http://localhost:8080`.
+* **API REST:** `http://localhost:8080`
+* **Console H2:** `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:ong_dev`)
 
-### 6.3 Executando o Frontend Console
+#### Opção B: Execução com PostgreSQL 16 Real (Perfil `prod`)
+Se desejar executar com PostgreSQL em contêiner Docker:
+```bash
+# 1. Na raiz do projeto, suba o container PostgreSQL
+docker compose up -d
+
+# 2. Inicie a aplicação com o perfil prod
+cd backend
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+### 6.3 Executando os Testes Automatizados (80 Testes)
+```powershell
+cd backend
+.\mvnw.cmd test
+```
+
+### 6.4 Executando o Frontend Console
 Como o front-end foi construído em arquitetura estática leve (Vanilla JS/CSS3/HTML5), basta abrir o arquivo diretamente no navegador ou servi-lo localmente:
 ```bash
-# Opção 1: Abra diretamente o index.html no navegador
+# Opção 1: Abra diretamente o index.html no navegador (dois cliques em frontend/index.html)
 # Opção 2: Ou sirva via utilitário estático simples
 npx serve frontend
 # ou
 python -m http.server 3000 --directory frontend
 ```
-Acesse a aplicação no navegador em `http://localhost:3000` (ou abrindo `frontend/index.html`).
+Acesse a aplicação no navegador em `http://localhost:3000` (ou abrindo o arquivo `frontend/index.html`).
 
 ---
 
