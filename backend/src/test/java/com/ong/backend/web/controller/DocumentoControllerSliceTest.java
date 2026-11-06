@@ -7,6 +7,7 @@ import com.ong.backend.domain.exception.DocumentoArquivadoException;
 import com.ong.backend.domain.exception.DocumentoNaoEncontradoException;
 import com.ong.backend.domain.exception.TipoDocumentoInvalidoException;
 import com.ong.backend.domain.model.Documento;
+import com.ong.backend.domain.model.PaginatedResult;
 import com.ong.backend.domain.model.TipoDocumento;
 import com.ong.backend.domain.model.VersaoDocumento;
 import com.ong.backend.web.dto.CriarDocumentoRequest;
@@ -55,6 +56,9 @@ class DocumentoControllerSliceTest {
 
     @Mock
     private ConsultarHistoricoVersoesUseCase consultarHistoricoVersoesUseCase;
+
+    @Mock
+    private BuscarDocumentosComFiltroUseCase buscarDocumentosComFiltroUseCase;
 
     @InjectMocks
     private DocumentoController controller;
@@ -254,5 +258,32 @@ class DocumentoControllerSliceTest {
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].numero", is(1)))
                 .andExpect(jsonPath("$[1].numero", is(2)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/documentos - Should list documents with filters and pagination")
+    void should_listDocumentsWithFilters() throws Exception {
+        Documento doc = Documento.criar("Ata 01", TipoDocumento.ATA, LocalDate.of(2026, 2, 10), "Secretaria", null);
+        java.lang.reflect.Field idField = Documento.class.getDeclaredField("id");
+        idField.setAccessible(true);
+        idField.set(doc, 1L);
+
+        PaginatedResult<Documento> paginatedResult = new PaginatedResult<>(List.of(doc), 0, 10, 1, 1);
+        when(buscarDocumentosComFiltroUseCase.buscarComFiltros(any(BuscarDocumentosFiltroQuery.class)))
+                .thenReturn(paginatedResult);
+
+        mockMvc.perform(get("/api/v1/documentos")
+                        .param("tipo", "ata")
+                        .param("data_inicio", "2026-01-01")
+                        .param("data_fim", "2026-06-30")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id", is(1)))
+                .andExpect(jsonPath("$.items[0].titulo", is("Ata 01")))
+                .andExpect(jsonPath("$.items[0].tipo", is("ata")))
+                .andExpect(jsonPath("$.total_elements", is(1)))
+                .andExpect(jsonPath("$.total_pages", is(1)));
     }
 }

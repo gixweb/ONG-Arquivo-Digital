@@ -4,6 +4,7 @@ import com.ong.backend.application.port.in.*;
 import com.ong.backend.application.port.out.DocumentoRepositoryPort;
 import com.ong.backend.domain.exception.DocumentoNaoEncontradoException;
 import com.ong.backend.domain.model.Documento;
+import com.ong.backend.domain.model.PaginatedResult;
 import com.ong.backend.domain.model.TipoDocumento;
 import com.ong.backend.domain.model.VersaoDocumento;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,8 @@ public class DocumentoService implements
         BuscarDocumentoPorIdUseCase,
         RegistrarNovaVersaoUseCase,
         ArquivarDocumentoUseCase,
-        ConsultarHistoricoVersoesUseCase {
+        ConsultarHistoricoVersoesUseCase,
+        BuscarDocumentosComFiltroUseCase {
 
     private final DocumentoRepositoryPort documentoRepository;
 
@@ -72,5 +74,18 @@ public class DocumentoService implements
             throw new DocumentoNaoEncontradoException(documentoId);
         }
         return documentoRepository.listarVersoesPorDocumentoId(documentoId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResult<Documento> buscarComFiltros(BuscarDocumentosFiltroQuery query) {
+        return documentoRepository.buscarComFiltros(
+                query.tipo(),
+                query.dataInicio(),
+                query.dataFim(),
+                query.titulo(),
+                query.page(),
+                query.size()
+        );
     }
 }

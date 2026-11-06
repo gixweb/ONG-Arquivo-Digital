@@ -2,6 +2,7 @@ package com.ong.backend.infrastructure.persistence.adapter;
 
 import com.ong.backend.application.port.out.DocumentoRepositoryPort;
 import com.ong.backend.domain.model.Documento;
+import com.ong.backend.domain.model.PaginatedResult;
 import com.ong.backend.domain.model.StatusDocumento;
 import com.ong.backend.domain.model.TipoDocumento;
 import org.junit.jupiter.api.DisplayName;
@@ -92,5 +93,52 @@ class DocumentoPersistenceAdapterIntegrationTest {
         Optional<Documento> arquivado = repositoryPort.buscarPorId(salvo.getId());
         assertThat(arquivado).isPresent();
         assertThat(arquivado.get().getStatus()).isEqualTo(StatusDocumento.ARQUIVADO);
+    }
+
+    @Test
+    @DisplayName("Should filter tipo=ata from 01/01 to 30/06 returning only atas in this period (CA4)")
+    void should_filterTipoAta_inPeriod_CA4() {
+        // Ata dentro do período (fevereiro)
+        repositoryPort.salvar(Documento.criar("Ata Reunião Q1", TipoDocumento.ATA, LocalDate.of(2026, 2, 10), "Secretaria", null));
+        // Ata dentro do período (maio)
+        repositoryPort.salvar(Documento.criar("Ata Reunião Q2", TipoDocumento.ATA, LocalDate.of(2026, 5, 20), "Secretaria", null));
+        // Ata fora do período (setembro)
+        repositoryPort.salvar(Documento.criar("Ata Reunião Q3", TipoDocumento.ATA, LocalDate.of(2026, 9, 15), "Secretaria", null));
+        // Contrato dentro do período (março) - outro tipo
+        repositoryPort.salvar(Documento.criar("Contrato Fornecedor", TipoDocumento.CONTRATO, LocalDate.of(2026, 3, 1), "Compras", null));
+
+        PaginatedResult<Documento> resultado = repositoryPort.buscarComFiltros(
+                "ata",
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 6, 30),
+                null,
+                0,
+                10
+        );
+
+        assertThat(resultado.totalElements()).isEqualTo(2);
+        assertThat(resultado.content()).hasSize(2);
+        assertThat(resultado.content()).allMatch(d -> d.getTipo() == TipoDocumento.ATA);
+        assertThat(resultado.content()).extracting(Documento::getTitulo)
+                .containsExactlyInAnyOrder("Ata Reunião Q1", "Ata Reunião Q2");
+    }
+
+    @Test
+    @DisplayName("Should search by partial title case-insensitive")
+    void should_searchByPartialTitle() {
+        repositoryPort.salvar(Documento.criar("Contrato de Locação Sede", TipoDocumento.CONTRATO, LocalDate.of(2026, 3, 1), "Jurídico", null));
+        repositoryPort.salvar(Documento.criar("Ofício Governamental", TipoDocumento.OFICIO, LocalDate.of(2026, 4, 1), "Diretoria", null));
+
+        PaginatedResult<Documento> resultado = repositoryPort.buscarComFiltros(
+                null,
+                null,
+                null,
+                "locação",
+                0,
+                10
+        );
+
+        assertThat(resultado.totalElements()).isEqualTo(1);
+        assertThat(resultado.content().get(0).getTitulo()).isEqualTo("Contrato de Locação Sede");
     }
 }
