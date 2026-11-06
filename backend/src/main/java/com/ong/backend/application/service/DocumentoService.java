@@ -4,6 +4,7 @@ import com.ong.backend.application.port.in.*;
 import com.ong.backend.application.port.out.DocumentoRepositoryPort;
 import com.ong.backend.domain.exception.DocumentoNaoEncontradoException;
 import com.ong.backend.domain.model.Documento;
+import com.ong.backend.domain.model.MetricasArquivo;
 import com.ong.backend.domain.model.PaginatedResult;
 import com.ong.backend.domain.model.TipoDocumento;
 import com.ong.backend.domain.model.VersaoDocumento;
@@ -19,7 +20,8 @@ public class DocumentoService implements
         RegistrarNovaVersaoUseCase,
         ArquivarDocumentoUseCase,
         ConsultarHistoricoVersoesUseCase,
-        BuscarDocumentosComFiltroUseCase {
+        BuscarDocumentosComFiltroUseCase,
+        ObterMetricasArquivoUseCase {
 
     private final DocumentoRepositoryPort documentoRepository;
 
@@ -87,5 +89,11 @@ public class DocumentoService implements
                 query.page(),
                 query.size()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public MetricasArquivo obterMetricas() {
+        return documentoRepository.obterMetricas();
     }
 }

@@ -1,6 +1,7 @@
 package com.ong.backend.application.port.out;
 
 import com.ong.backend.domain.model.Documento;
+import com.ong.backend.domain.model.MetricasArquivo;
 import com.ong.backend.domain.model.PaginatedResult;
 import com.ong.backend.domain.model.VersaoDocumento;
 
@@ -26,6 +27,8 @@ public interface DocumentoRepositoryPort {
             int page,
             int size
     );
+
+    MetricasArquivo obterMetricas();
 
     boolean existePorId(Long id);
 

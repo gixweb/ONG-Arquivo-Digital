@@ -2,6 +2,7 @@ package com.ong.backend.infrastructure.persistence.adapter;
 
 import com.ong.backend.application.port.out.DocumentoRepositoryPort;
 import com.ong.backend.domain.model.Documento;
+import com.ong.backend.domain.model.MetricasArquivo;
 import com.ong.backend.domain.model.PaginatedResult;
 import com.ong.backend.domain.model.StatusDocumento;
 import com.ong.backend.domain.model.TipoDocumento;
@@ -58,54 +59,61 @@ class DocumentoPersistenceAdapterIntegrationTest {
                 "Contrato Prestação de Serviços",
                 TipoDocumento.CONTRATO,
                 LocalDate.of(2026, 2, 1),
-                "Jurídico",
-                "Minuta inicial"
+                "Coordenação Financeira",
+                "Versão inicial"
         );
         Documento salvo = repositoryPort.salvar(doc);
 
-        salvo.registrarNovaVersao("Adicionada cláusula anticorrupção");
+        salvo.registrarNovaVersao("Adicionada cláusula de rescisão no item 5");
         Documento atualizado = repositoryPort.salvar(salvo);
 
         assertThat(atualizado.getVersaoAtual()).isEqualTo(2);
+        assertThat(atualizado.getVersoes()).hasSize(2);
 
-        Optional<Documento> comHistorico = repositoryPort.buscarPorIdComVersoes(atualizado.getId());
-        assertThat(comHistorico).isPresent();
-        assertThat(comHistorico.get().getVersoes()).hasSize(2);
-        assertThat(comHistorico.get().getVersoes().get(1).getNumero()).isEqualTo(2);
-        assertThat(comHistorico.get().getVersoes().get(1).getObservacao()).isEqualTo("Adicionada cláusula anticorrupção");
+        Optional<Documento> recuperado = repositoryPort.buscarPorIdComVersoes(salvo.getId());
+        assertThat(recuperado).isPresent();
+        assertThat(recuperado.get().getVersaoAtual()).isEqualTo(2);
+        assertThat(recuperado.get().getVersoes()).hasSize(2);
+        assertThat(recuperado.get().getVersoes().get(1).getNumero()).isEqualTo(2);
+        assertThat(recuperado.get().getVersoes().get(1).getObservacao()).isEqualTo("Adicionada cláusula de rescisão no item 5");
     }
 
     @Test
-    @DisplayName("Should archive document and persist arquivado status")
-    void should_archiveAndPersistStatus() {
+    @DisplayName("Should archive document and persist status change (RF04)")
+    void should_persistArchivedStatus() {
         Documento doc = Documento.criar(
-                "Relatório Semestral de Atividades",
+                "Relatório de Prestação de Contas 2025",
                 TipoDocumento.RELATORIO,
-                LocalDate.of(2026, 6, 30),
-                "Coordenação de Projetos",
-                "Versão final"
+                LocalDate.of(2026, 1, 15),
+                "Auditoria Externa",
+                "Versão homologada"
         );
         Documento salvo = repositoryPort.salvar(doc);
 
         salvo.arquivar();
         repositoryPort.salvar(salvo);
 
-        Optional<Documento> arquivado = repositoryPort.buscarPorId(salvo.getId());
-        assertThat(arquivado).isPresent();
-        assertThat(arquivado.get().getStatus()).isEqualTo(StatusDocumento.ARQUIVADO);
+        Optional<Documento> recuperado = repositoryPort.buscarPorIdComVersoes(salvo.getId());
+        assertThat(recuperado).isPresent();
+        assertThat(recuperado.get().getStatus()).isEqualTo(StatusDocumento.ARQUIVADO);
     }
 
     @Test
-    @DisplayName("Should filter tipo=ata from 01/01 to 30/06 returning only atas in this period (CA4)")
-    void should_filterTipoAta_inPeriod_CA4() {
-        // Ata dentro do período (fevereiro)
-        repositoryPort.salvar(Documento.criar("Ata Reunião Q1", TipoDocumento.ATA, LocalDate.of(2026, 2, 10), "Secretaria", null));
-        // Ata dentro do período (maio)
-        repositoryPort.salvar(Documento.criar("Ata Reunião Q2", TipoDocumento.ATA, LocalDate.of(2026, 5, 20), "Secretaria", null));
-        // Ata fora do período (setembro)
-        repositoryPort.salvar(Documento.criar("Ata Reunião Q3", TipoDocumento.ATA, LocalDate.of(2026, 9, 15), "Secretaria", null));
-        // Contrato dentro do período (março) - outro tipo
-        repositoryPort.salvar(Documento.criar("Contrato Fornecedor", TipoDocumento.CONTRATO, LocalDate.of(2026, 3, 1), "Compras", null));
+    @DisplayName("Should filter by tipo=ata and date period 01/01 to 30/06 exclusively (CA4)")
+    void should_filterByTipoAndDateRange_CA4() {
+        // Documentos que atendem ao critério (ata entre 01/01/2026 e 30/06/2026)
+        repositoryPort.salvar(Documento.criar("Ata Reunião Q1", TipoDocumento.ATA, LocalDate.of(2026, 1, 15), "Secretaria", null));
+        repositoryPort.salvar(Documento.criar("Ata Reunião Q2", TipoDocumento.ATA, LocalDate.of(2026, 6, 30), "Secretaria", null));
+
+        // Documentos que NÃO devem ser retornados:
+        // 1. Ata fora do período (posterior)
+        repositoryPort.salvar(Documento.criar("Ata Reunião Q3", TipoDocumento.ATA, LocalDate.of(2026, 7, 1), "Secretaria", null));
+        // 2. Ata fora do período (anterior)
+        repositoryPort.salvar(Documento.criar("Ata Reunião Antiga", TipoDocumento.ATA, LocalDate.of(2025, 12, 31), "Secretaria", null));
+        // 3. Contrato dentro do período (tipo diferente)
+        repositoryPort.salvar(Documento.criar("Contrato Parceria", TipoDocumento.CONTRATO, LocalDate.of(2026, 3, 15), "Diretoria", null));
+        // 4. Relatório dentro do período (tipo diferente)
+        repositoryPort.salvar(Documento.criar("Relatório Financeiro", TipoDocumento.RELATORIO, LocalDate.of(2026, 5, 10), "Tesouraria", null));
 
         PaginatedResult<Documento> resultado = repositoryPort.buscarComFiltros(
                 "ata",
@@ -140,5 +148,28 @@ class DocumentoPersistenceAdapterIntegrationTest {
 
         assertThat(resultado.totalElements()).isEqualTo(1);
         assertThat(resultado.content().get(0).getTitulo()).isEqualTo("Contrato de Locação Sede");
+    }
+
+    @Test
+    @DisplayName("Should calculate consolidated metrics (US06 / RF06)")
+    void should_calculateConsolidatedMetrics() {
+        Documento d1 = Documento.criar("Ata 1", TipoDocumento.ATA, LocalDate.now(), "Sec", null);
+        Documento d2 = Documento.criar("Ata 2", TipoDocumento.ATA, LocalDate.now(), "Sec", null);
+        d2.arquivar();
+        Documento d3 = Documento.criar("Contrato 1", TipoDocumento.CONTRATO, LocalDate.now(), "Jur", null);
+
+        repositoryPort.salvar(d1);
+        repositoryPort.salvar(d2);
+        repositoryPort.salvar(d3);
+
+        MetricasArquivo metricas = repositoryPort.obterMetricas();
+
+        assertThat(metricas.total()).isGreaterThanOrEqualTo(3L);
+        assertThat(metricas.vigentes()).isGreaterThanOrEqualTo(2L);
+        assertThat(metricas.arquivados()).isGreaterThanOrEqualTo(1L);
+        assertThat(metricas.porTipo()).containsKey("ata");
+        assertThat(metricas.porTipo()).containsKey("contrato");
+        assertThat(metricas.porTipo()).containsKey("relatorio");
+        assertThat(metricas.porTipo()).containsKey("oficio");
     }
 }
