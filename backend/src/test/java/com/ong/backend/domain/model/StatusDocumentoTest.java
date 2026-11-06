@@ -27,6 +27,13 @@ class StatusDocumentoTest {
     }
 
     @Test
+    @DisplayName("Should throw IllegalArgumentException when status is null")
+    void should_throwException_when_statusIsNull() {
+        assertThatThrownBy(() -> StatusDocumento.from(null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     @DisplayName("Should return correct lowercase code")
     void should_returnCorrectCode() {
         assertThat(StatusDocumento.VIGENTE.getCodigo()).isEqualTo("vigente");

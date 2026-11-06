@@ -35,4 +35,11 @@ class TipoDocumentoTest {
         assertThatThrownBy(() -> TipoDocumento.from(valor))
                 .isInstanceOf(TipoDocumentoInvalidoException.class);
     }
+
+    @Test
+    @DisplayName("Should reject null document type")
+    void should_throwException_when_tipoIsNull() {
+        assertThatThrownBy(() -> TipoDocumento.from(null))
+                .isInstanceOf(TipoDocumentoInvalidoException.class);
+    }
 }
