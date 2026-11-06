@@ -7,8 +7,7 @@
 [![Java](https://img.shields.io/badge/Java-21%20LTS-red.svg)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.x-brightgreen.svg)](https://spring.io/projects/spring-boot)
 
-> **Desafio 14: Arquivo Digital da ONG** — Atividade Prática de Engenharia de Software, Gestão de Backlog e SDLC (Senac 2026.2, Prof. Roni Maciel).
-
+> **Arquivo Digital da ONG** — Atividade Prática de Engenharia de Software, Gestão de Backlog e SDLC.
 ---
 
 ## 1. Problema e Solução
