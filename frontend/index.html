@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arquivo Digital — ONG Transparência & Cidadania</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Top Header -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand">
+                <div class="brand-icon">📁</div>
+                <div>
+                    <h1>Arquivo Digital</h1>
+                    <p class="subtitle">Secretaria Administrativa &middot; Gestão Documental e Auditoria</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="connection-status" id="connectionStatus" title="Status da API REST">
+                    <span class="status-dot online"></span>
+                    <span class="status-text" id="apiStatusText">Conectado ao Backend</span>
+                </div>
+                <button id="btnNovoDocumento" class="btn btn-primary">
+                    <span class="btn-icon">+</span> Novo Documento
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Toast / Alerts Notification Container -->
+        <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+        <!-- Dashboard KPI Metrics Cards (RF06 / US06) -->
+        <section class="metrics-section" aria-label="Painel de Métricas do Acervo">
+            <h2 class="section-title">Resumo do Acervo</h2>
+            <div class="metrics-grid">
+                <div class="metric-card card-total">
+                    <div class="metric-header">
+                        <span class="metric-label">Total de Documentos</span>
+                        <span class="metric-icon">📑</span>
+                    </div>
+                    <div class="metric-value" id="metricTotal">—</div>
+                    <div class="metric-footnote">Documentos catalogados</div>
+                </div>
+
+                <div class="metric-card card-vigentes">
+                    <div class="metric-header">
+                        <span class="metric-label">Documentos Vigentes</span>
+                        <span class="metric-icon">🟢</span>
+                    </div>
+                    <div class="metric-value" id="metricVigentes">—</div>
+                    <div class="metric-footnote">Aptos para revisão e consulta</div>
+                </div>
+
+                <div class="metric-card card-arquivados">
+                    <div class="metric-header">
+                        <span class="metric-label">Documentos Arquivados</span>
+                        <span class="metric-icon">🔒</span>
+                    </div>
+                    <div class="metric-value" id="metricArquivados">—</div>
+                    <div class="metric-footnote">Imutáveis e finalizados</div>
+                </div>
+
+                <div class="metric-card card-tipos">
+                    <div class="metric-header">
+                        <span class="metric-label">Distribuição por Tipo</span>
+                        <span class="metric-icon">📊</span>
+                    </div>
+                    <div class="types-breakdown" id="metricTipos">
+                        <span class="type-pill pill-ata">Atas: <strong id="tipoAta">—</strong></span>
+                        <span class="type-pill pill-contrato">Contratos: <strong id="tipoContrato">—</strong></span>
+                        <span class="type-pill pill-relatorio">Relatórios: <strong id="tipoRelatorio">—</strong></span>
+                        <span class="type-pill pill-oficio">Ofícios: <strong id="tipoOficio">—</strong></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filters Section (RF02 / CA4) -->
+        <section class="filters-section card" aria-label="Filtros de Busca Documental">
+            <form id="filterForm" class="filter-form">
+                <div class="form-group">
+                    <label for="filterTipo">Tipo de Documento</label>
+                    <select id="filterTipo" name="tipo">
+                        <option value="">Todos os tipos</option>
+                        <option value="ata">Ata</option>
+                        <option value="contrato">Contrato</option>
+                        <option value="relatorio">Relatório</option>
+                        <option value="oficio">Ofício</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="filterDataInicio">Data Início</label>
+                    <input type="date" id="filterDataInicio" name="dataInicio">
+                </div>
+
+                <div class="form-group">
+                    <label for="filterDataFim">Data Fim</label>
+                    <input type="date" id="filterDataFim" name="dataFim">
+                </div>
+
+                <div class="form-group form-group-grow">
+                    <label for="filterTitulo">Busca por Título</label>
+                    <input type="text" id="filterTitulo" name="titulo" placeholder="Ex: Assembleia, Aluguel, Prestação..." autocomplete="off">
+                </div>
+
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary" id="btnFiltrar">
+                        <span>🔍</span> Filtrar
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btnLimparFiltros">
+                        <span>🔄</span> Limpar
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Main Documents Table Section -->
+        <section class="documents-section card" aria-label="Listagem de Documentos">
+            <div class="section-header">
+                <h2 class="section-title">Documentos Cadastrados</h2>
+                <span class="results-count" id="resultsCount">Carregando acervo...</span>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="state-container hidden">
+                <div class="spinner"></div>
+                <p>Consultando base de documentos...</p>
+            </div>
+
+            <!-- Error State with Retry Button (RNF06) -->
+            <div id="errorState" class="state-container state-error hidden">
+                <div class="state-icon">⚠️</div>
+                <h3 id="errorMessage">Falha na comunicação com o servidor</h3>
+                <p id="errorDetail">Verifique se o backend Spring Boot está ativo em http://localhost:8080.</p>
+                <button type="button" class="btn btn-primary" id="btnRetry">Tentar Novamente</button>
+            </div>
+
+            <!-- Empty State (RNF06) -->
+            <div id="emptyState" class="state-container state-empty hidden">
+                <div class="state-icon">📄</div>
+                <h3>Nenhum documento encontrado</h3>
+                <p>Nenhum registro corresponde aos filtros selecionados. Tente ajustar os parâmetros de busca ou cadastrar um novo documento.</p>
+            </div>
+
+            <!-- Data Table -->
+            <div class="table-responsive" id="tableContainer">
+                <table class="data-table" id="documentsTable">
+                    <thead>
+                        <tr>
+                            <th scope="col" style="width: 60px;">ID</th>
+                            <th scope="col">Título</th>
+                            <th scope="col" style="width: 110px;">Tipo</th>
+                            <th scope="col" style="width: 120px;">Data</th>
+                            <th scope="col">Responsável</th>
+                            <th scope="col" style="width: 90px; text-align: center;">Versão</th>
+                            <th scope="col" style="width: 110px; text-align: center;">Status</th>
+                            <th scope="col" style="width: 250px; text-align: center;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="documentsTableBody">
+                        <!-- Dynamic rows populated via app.js -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="pagination-bar" id="paginationBar">
+                <div class="pagination-info" id="paginationInfo">Página 1 de 1</div>
+                <div class="pagination-controls">
+                    <button type="button" class="btn btn-secondary btn-sm" id="btnPrevPage" disabled>&larr; Anterior</button>
+                    <span class="page-current" id="currentPageLabel">1</span>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btnNextPage" disabled>Próxima &rarr;</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal 1: Novo Documento (RF01 / CA1) -->
+    <div id="modalNovoDocumento" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalNovoTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalNovoTitle">Cadastrar Novo Documento</h3>
+                <button type="button" class="btn-close" data-close-modal>&times;</button>
+            </div>
+            <form id="formNovoDocumento">
+                <div class="modal-body">
+                    <div id="novoDocError" class="alert alert-error hidden"></div>
+
+                    <div class="form-group">
+                        <label for="novoTitulo">Título do Documento *</label>
+                        <input type="text" id="novoTitulo" name="titulo" required maxlength="255" placeholder="Ex: Ata da 12ª Reunião Ordinária">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="novoTipo">Tipo Oficial *</label>
+                            <select id="novoTipo" name="tipo" required>
+                                <option value="" disabled selected>Selecione o tipo</option>
+                                <option value="ata">Ata</option>
+                                <option value="contrato">Contrato</option>
+                                <option value="relatorio">Relatório</option>
+                                <option value="oficio">Ofício</option>
+                            </select>
+                            <small class="form-hint">Tipos permitidos: ata, contrato, relatorio, oficio.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="novoDataDocumento">Data do Documento *</label>
+                            <input type="date" id="novoDataDocumento" name="dataDocumento" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="novoResponsavel">Responsável Fictício *</label>
+                        <input type="text" id="novoResponsavel" name="responsavel" required maxlength="150" placeholder="Ex: Maria Alice Ferreira - Secretária Geral">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="novoObservacao">Observação Inicial (Opcional)</label>
+                        <textarea id="novoObservacao" name="observacaoInicial" rows="2" placeholder="Observações sobre a elaboração da primeira versão..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal>Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btnSalvarNovoDoc">Salvar Documento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Nova Versão (RF03 / CA2) -->
+    <div id="modalNovaVersao" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalVersaoTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalVersaoTitle">Registrar Nova Versão</h3>
+                <button type="button" class="btn-close" data-close-modal>&times;</button>
+            </div>
+            <form id="formNovaVersao">
+                <input type="hidden" id="versaoDocId">
+                <div class="modal-body">
+                    <div id="novaVersaoError" class="alert alert-error hidden"></div>
+
+                    <div class="doc-summary-box">
+                        <p><strong>Documento:</strong> <span id="versaoDocTitulo">—</span></p>
+                        <p><strong>Versão Atual:</strong> <span id="versaoDocAtual" class="badge badge-version">v1</span> &rarr; Próxima versão: <strong id="versaoDocProxima" class="badge badge-version">v2</strong></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="versaoObservacao">Motivo / Observação da Alteração *</label>
+                        <textarea id="versaoObservacao" name="observacao" required rows="3" placeholder="Descreva as alterações efetuadas nesta revisão (ex: Adicionada cláusula de rescisão no item 5)..."></textarea>
+                        <small class="form-hint">Obrigatório para rastreabilidade e auditoria (RF03).</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal>Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btnSalvarNovaVersao">Salvar Versão</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 3: Histórico de Versões e Auditoria (RF05) -->
+    <div id="modalHistorico" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalHistTitle">
+        <div class="modal-card modal-large">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modalHistTitle">Histórico de Versões & Auditoria</h3>
+                    <p class="modal-subtitle" id="histDocTitulo">—</p>
+                </div>
+                <button type="button" class="btn-close" data-close-modal>&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="histLoading" class="state-container"><div class="spinner"></div></div>
+                <div id="histContent" class="timeline-container hidden">
+                    <!-- Populated dynamically via app.js -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-close-modal>Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 4: Confirmação de Arquivamento (RF04 / CA3 / RNF06) -->
+    <div id="modalArquivar" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalArqTitle">
+        <div class="modal-card">
+            <div class="modal-header header-warning">
+                <h3 id="modalArqTitle">Confirmar Arquivamento Definitivo</h3>
+                <button type="button" class="btn-close" data-close-modal>&times;</button>
+            </div>
+            <input type="hidden" id="arquivarDocId">
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>Atenção: Ação Irreversível!</strong>
+                    <p>Ao arquivar o documento <strong id="arquivarDocTitulo"></strong>, ele passará ao status <code>arquivado</code> e se tornará estritamente imutável.</p>
+                    <p>Qualquer tentativa futura de registrar novas versões será bloqueada com erro <code>409 Conflict</code> (RF04 / CA3).</p>
+                </div>
+                <p>Tem certeza que deseja arquivar este documento?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-close-modal>Cancelar</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarArquivar">Sim, Arquivar Documento</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="app-footer">
+        <p>&copy; 2026 Arquivo Digital &middot; ONG Transparência &amp; Cidadania &middot; Projeto Acadêmico Senac (Desafio 14)</p>
+    </footer>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
