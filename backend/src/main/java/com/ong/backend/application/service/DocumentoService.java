@@ -1,17 +1,23 @@
 package com.ong.backend.application.service;
 
-import com.ong.backend.application.port.in.BuscarDocumentoPorIdUseCase;
-import com.ong.backend.application.port.in.CriarDocumentoCommand;
-import com.ong.backend.application.port.in.CriarDocumentoUseCase;
+import com.ong.backend.application.port.in.*;
 import com.ong.backend.application.port.out.DocumentoRepositoryPort;
 import com.ong.backend.domain.exception.DocumentoNaoEncontradoException;
 import com.ong.backend.domain.model.Documento;
 import com.ong.backend.domain.model.TipoDocumento;
+import com.ong.backend.domain.model.VersaoDocumento;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
-public class DocumentoService implements CriarDocumentoUseCase, BuscarDocumentoPorIdUseCase {
+public class DocumentoService implements
+        CriarDocumentoUseCase,
+        BuscarDocumentoPorIdUseCase,
+        RegistrarNovaVersaoUseCase,
+        ArquivarDocumentoUseCase,
+        ConsultarHistoricoVersoesUseCase {
 
     private final DocumentoRepositoryPort documentoRepository;
 
@@ -40,5 +46,31 @@ public class DocumentoService implements CriarDocumentoUseCase, BuscarDocumentoP
     public Documento buscarPorId(Long id) {
         return documentoRepository.buscarPorIdComVersoes(id)
                 .orElseThrow(() -> new DocumentoNaoEncontradoException(id));
+    }
+
+    @Override
+    @Transactional
+    public VersaoDocumento registrarNovaVersao(Long documentoId, String observacao) {
+        Documento documento = buscarPorId(documentoId);
+        VersaoDocumento novaVersao = documento.registrarNovaVersao(observacao);
+        documentoRepository.salvar(documento);
+        return novaVersao;
+    }
+
+    @Override
+    @Transactional
+    public Documento arquivar(Long documentoId) {
+        Documento documento = buscarPorId(documentoId);
+        documento.arquivar();
+        return documentoRepository.salvar(documento);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VersaoDocumento> consultarHistorico(Long documentoId) {
+        if (!documentoRepository.existePorId(documentoId)) {
+            throw new DocumentoNaoEncontradoException(documentoId);
+        }
+        return documentoRepository.listarVersoesPorDocumentoId(documentoId);
     }
 }
