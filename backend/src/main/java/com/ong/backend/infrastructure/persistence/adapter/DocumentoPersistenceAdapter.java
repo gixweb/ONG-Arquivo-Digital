@@ -2,7 +2,9 @@ package com.ong.backend.infrastructure.persistence.adapter;
 
 import com.ong.backend.application.port.out.DocumentoRepositoryPort;
 import com.ong.backend.domain.model.Documento;
+import com.ong.backend.domain.model.MetricasArquivo;
 import com.ong.backend.domain.model.PaginatedResult;
+import com.ong.backend.domain.model.TipoDocumento;
 import com.ong.backend.domain.model.VersaoDocumento;
 import com.ong.backend.infrastructure.persistence.entity.DocumentoJpaEntity;
 import com.ong.backend.infrastructure.persistence.mapper.DocumentoPersistenceMapper;
@@ -17,7 +19,10 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Component
@@ -102,6 +107,41 @@ public class DocumentoPersistenceAdapter implements DocumentoRepositoryPort {
                 pagedEntities.getSize(),
                 pagedEntities.getTotalElements(),
                 pagedEntities.getTotalPages()
+        );
+    }
+
+    @Override
+    public MetricasArquivo obterMetricas() {
+        long total = jpaRepository.count();
+
+        Map<String, Long> statusMap = new HashMap<>();
+        statusMap.put("vigente", 0L);
+        statusMap.put("arquivado", 0L);
+        for (Object[] row : jpaRepository.countByStatusGroup()) {
+            if (row != null && row.length >= 2) {
+                String status = (String) row[0];
+                Long count = ((Number) row[1]).longValue();
+                statusMap.put(status, count);
+            }
+        }
+
+        Map<String, Long> tipoMap = new LinkedHashMap<>();
+        for (TipoDocumento tipo : TipoDocumento.values()) {
+            tipoMap.put(tipo.getCodigo(), 0L);
+        }
+        for (Object[] row : jpaRepository.countByTipoGroup()) {
+            if (row != null && row.length >= 2) {
+                String tipo = (String) row[0];
+                Long count = ((Number) row[1]).longValue();
+                tipoMap.put(tipo, count);
+            }
+        }
+
+        return new MetricasArquivo(
+                total,
+                statusMap.getOrDefault("vigente", 0L),
+                statusMap.getOrDefault("arquivado", 0L),
+                tipoMap
         );
     }
 

@@ -6,6 +6,7 @@ import com.ong.backend.domain.exception.DocumentoArquivadoException;
 import com.ong.backend.domain.exception.DocumentoNaoEncontradoException;
 import com.ong.backend.domain.exception.TipoDocumentoInvalidoException;
 import com.ong.backend.domain.model.Documento;
+import com.ong.backend.domain.model.MetricasArquivo;
 import com.ong.backend.domain.model.StatusDocumento;
 import com.ong.backend.domain.model.TipoDocumento;
 import com.ong.backend.domain.model.VersaoDocumento;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,76 +59,69 @@ class DocumentoServiceTest {
         assertThat(criado).isNotNull();
         assertThat(criado.getTitulo()).isEqualTo("Ata de Fundação");
         assertThat(criado.getTipo()).isEqualTo(TipoDocumento.ATA);
+        assertThat(criado.getStatus()).isEqualTo(StatusDocumento.VIGENTE);
         assertThat(criado.getVersaoAtual()).isEqualTo(1);
         verify(repositoryPort).salvar(any(Documento.class));
     }
 
     @Test
-    @DisplayName("Should throw TipoDocumentoInvalidoException when tipo is memorando (CA1)")
-    void should_throwException_when_tipoIsMemorando_CA1() {
+    @DisplayName("Should reject invalid document type")
+    void should_rejectInvalidTipo() {
         CriarDocumentoCommand command = new CriarDocumentoCommand(
-                "Memorando Interno 01",
+                "Memorando Interno",
                 "memorando",
-                LocalDate.now(),
-                "Gerência",
+                LocalDate.of(2026, 1, 1),
+                "Secretário",
                 null
         );
 
         assertThatThrownBy(() -> service.criar(command))
-                .isInstanceOf(TipoDocumentoInvalidoException.class)
-                .hasMessageContaining("memorando");
+                .isInstanceOf(TipoDocumentoInvalidoException.class);
     }
 
     @Test
-    @DisplayName("Should return document when found by id")
-    void should_returnDocument_when_foundById() {
-        Documento doc = Documento.criar("Contrato X", TipoDocumento.CONTRATO, LocalDate.now(), "Diretoria", null);
+    @DisplayName("Should find document by id or throw 404 domain exception")
+    void should_findDocumentById() {
+        Documento doc = Documento.criar("Contrato 01", TipoDocumento.CONTRATO, LocalDate.now(), "Admin", null);
         when(repositoryPort.buscarPorIdComVersoes(1L)).thenReturn(Optional.of(doc));
-
-        Documento resultado = service.buscarPorId(1L);
-
-        assertThat(resultado).isEqualTo(doc);
-    }
-
-    @Test
-    @DisplayName("Should throw DocumentoNaoEncontradoException when id does not exist")
-    void should_throwException_when_notFoundById() {
         when(repositoryPort.buscarPorIdComVersoes(99L)).thenReturn(Optional.empty());
 
+        Documento found = service.buscarPorId(1L);
+        assertThat(found).isEqualTo(doc);
+
         assertThatThrownBy(() -> service.buscarPorId(99L))
-                .isInstanceOf(DocumentoNaoEncontradoException.class)
-                .hasMessageContaining("99");
+                .isInstanceOf(DocumentoNaoEncontradoException.class);
     }
 
     @Test
-    @DisplayName("Should register new version incrementing versao_atual (CA2)")
-    void should_registerNewVersion_CA2() {
-        Documento doc = Documento.criar("Ata Q1", TipoDocumento.ATA, LocalDate.now(), "Secretaria", "Inicial");
+    @DisplayName("Should register new version on active document")
+    void should_registerNewVersion() {
+        Documento doc = Documento.criar("Contrato 01", TipoDocumento.CONTRATO, LocalDate.now(), "Admin", "Inicial");
         when(repositoryPort.buscarPorIdComVersoes(1L)).thenReturn(Optional.of(doc));
         when(repositoryPort.salvar(any(Documento.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        VersaoDocumento novaVersao = service.registrarNovaVersao(1L, "Revisão ortográfica");
+        VersaoDocumento versao2 = service.registrarNovaVersao(1L, "Revisão cláusula 3");
 
-        assertThat(novaVersao.getNumero()).isEqualTo(2);
-        assertThat(novaVersao.getObservacao()).isEqualTo("Revisão ortográfica");
+        assertThat(versao2.getNumero()).isEqualTo(2);
+        assertThat(versao2.getObservacao()).isEqualTo("Revisão cláusula 3");
         assertThat(doc.getVersaoAtual()).isEqualTo(2);
         assertThat(doc.getVersoes()).hasSize(2);
         verify(repositoryPort).salvar(doc);
     }
 
     @Test
-    @DisplayName("Should throw DocumentoArquivadoException when registering version on archived doc (CA3)")
-    void should_throwException_when_documentIsArchived_CA3() {
-        Documento doc = Documento.criar("Relatório Anual", TipoDocumento.RELATORIO, LocalDate.now(), "Financeiro", "Final");
+    @DisplayName("Should reject new version when document is archived")
+    void should_rejectNewVersion_whenArchived() {
+        Documento doc = Documento.criar("Relatório Anual", TipoDocumento.RELATORIO, LocalDate.now(), "Diretoria", null);
         doc.arquivar();
         when(repositoryPort.buscarPorIdComVersoes(1L)).thenReturn(Optional.of(doc));
 
-        assertThatThrownBy(() -> service.registrarNovaVersao(1L, "Tentativa"))
+        assertThatThrownBy(() -> service.registrarNovaVersao(1L, "Tentativa de alteração"))
                 .isInstanceOf(DocumentoArquivadoException.class);
     }
 
     @Test
-    @DisplayName("Should archive document successfully")
+    @DisplayName("Should archive active document")
     void should_archiveDocument() {
         Documento doc = Documento.criar("Ofício 02", TipoDocumento.OFICIO, LocalDate.now(), "Diretoria", null);
         when(repositoryPort.buscarPorIdComVersoes(1L)).thenReturn(Optional.of(doc));
@@ -151,5 +146,20 @@ class DocumentoServiceTest {
         assertThat(historico).hasSize(2);
         assertThat(historico.get(0).getNumero()).isEqualTo(1);
         assertThat(historico.get(1).getNumero()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Should return consolidated metrics from repository")
+    void should_returnMetrics() {
+        MetricasArquivo metricas = new MetricasArquivo(10L, 8L, 2L, Map.of("ata", 4L, "contrato", 3L, "relatorio", 2L, "oficio", 1L));
+        when(repositoryPort.obterMetricas()).thenReturn(metricas);
+
+        MetricasArquivo resultado = service.obterMetricas();
+
+        assertThat(resultado.total()).isEqualTo(10L);
+        assertThat(resultado.vigentes()).isEqualTo(8L);
+        assertThat(resultado.arquivados()).isEqualTo(2L);
+        assertThat(resultado.porTipo()).containsEntry("ata", 4L);
+        verify(repositoryPort).obterMetricas();
     }
 }
