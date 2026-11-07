@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Monitorar dependências Maven no backend
+  - package-ecosystem: "maven"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "type:chore"
+      - "scope:devops"
+
+  # Monitorar GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    labels:
+      - "type:chore"
+      - "scope:devops"

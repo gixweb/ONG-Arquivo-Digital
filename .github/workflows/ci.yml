@@ -28,3 +28,12 @@ jobs:
       - name: Build and Run Tests
         working-directory: backend
         run: ./mvnw clean verify -B
+
+      - name: Upload Test and JaCoCo Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-and-jacoco-reports
+          path: |
+            backend/target/surefire-reports/
+            backend/target/site/jacoco/
