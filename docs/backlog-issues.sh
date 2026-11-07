@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Script para criação automatizada das 15 Issues e Milestones no GitHub via GitHub CLI (gh)
-# Repositório: https://github.com/gixweb/ONG-AD
+# Repositório: https://github.com/gixweb/ONG-Arquivo-Digital
 
 set -e
 

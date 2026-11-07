@@ -1,4 +1,4 @@
-# Root .gitignore for ONG-AD (Arquivo Digital)
+# Root .gitignore for ONG-Arquivo-Digital (Arquivo Digital da ONG)
 
 # Environment variables
 .env

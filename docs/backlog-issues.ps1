@@ -1,5 +1,5 @@
 # Script PowerShell para criação automatizada das 15 Issues e Milestones no GitHub via GitHub CLI (gh)
-# Repositório: https://github.com/gixweb/ONG-AD
+# Repositório: https://github.com/gixweb/ONG-Arquivo-Digital
 
 Write-Host "=== 1. Criando Labels ===" -ForegroundColor Cyan
 gh label create documentation --description "Documentos de planejamento e arquitetura" --color "0075ca" --force 2>$null

@@ -3,7 +3,7 @@
 
 | Informação | Detalhe |
 | :--- | :--- |
-| **Projeto** | Arquivo Digital da ONG (ONG-AD) |
+| **Projeto** | Arquivo Digital da ONG (ONG-Arquivo-Digital) |
 | **Versão** | 1.0.0 (Planejamento) |
 | **Status** | Aprovado |
 | **Data** | 05 de Novembro de 2026 |
