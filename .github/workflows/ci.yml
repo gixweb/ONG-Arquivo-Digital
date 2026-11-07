@@ -31,7 +31,7 @@ jobs:
 
       - name: Upload Test and JaCoCo Reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: surefire-and-jacoco-reports
           path: |
