@@ -11,6 +11,7 @@ O **Arquivo Digital da ONG** é projetado sob os fundamentos da **Arquitetura Li
 * **Independência de Frameworks (Inversão de Dependência):** A camada de domínio é escrita em **Java 21 puro**, sem nenhuma anotação ou dependência de Spring Boot ou Jakarta Persistence (JPA).
 * **Alta Coesão e Baixo Acoplamento:** As regras de negócio centrais (validação de tipos homologados, incremento atômico de versão e bloqueio estrito contra alterações em documentos arquivados) residem exclusivamente no agregado de domínio.
 * **Integridade Transacional (ACID):** O versionamento documental sincroniza atomicamente as tabelas `documentos` e `versoes` sob o isolamento `READ_COMMITTED` e restrição relacional de unicidade `UNIQUE(documento_id, numero)`.
+* **Segurança e Papéis de Acesso (RBAC):** Controle estrito por papéis: `SECRETARIA` (permissão de escrita e consulta) e `AUDITOR` (permissão estritamente de consulta/somente leitura).
 * **Padronização RESTful e RFC 7807:** Todas as respostas de erro HTTP seguem o contrato padronizado *Problem Details for HTTP APIs* (`ProblemDetail`), com `correlationId` e `timestamp`.
 * **Quality Gates Arquiteturais Automatizados:** A pureza das fronteiras arquiteturais é verificada em cada build pelo **ArchUnit**.
 
@@ -22,12 +23,12 @@ O **Arquivo Digital da ONG** é projetado sob os fundamentos da **Arquitetura Li
 
 ```mermaid
 flowchart TD
-    User["Secretaria Administrativa / Auditoria\n(Usuário do Sistema)"]
+    UserSec["Secretaria Administrativa\n(Cadastra, versiona, arquiva)"]
+    UserAud["Auditoria / Órgão Regulador\n(Consulta acervo e histórico de auditoria)"]
     System["Sistema Arquivo Digital da ONG\n(Gestão de Documentos Oficiais, Auditoria e Versionamento)"]
-    External["Conselho / Financiadores / Órgãos Fiscais\n(Inspeção de Contratos e Atas Vigentes)"]
 
-    User -->|Cadastra, versiona, arquiva e pesquisa documentos| System
-    External -->|Recebe relatórios e auditorias das versões oficiais| System
+    UserSec -->|Cadastra, versiona e arquiva documentos| System
+    UserAud -->|Consulta acervo e histórico imutável| System
 ```
 
 ---
@@ -43,7 +44,7 @@ flowchart TD
     end
 
     subgraph ServerContainer ["Contêiner Backend (Pasta backend/)"]
-        API["API REST Spring Boot 3.4.x (Java 21 LTS)\nControladores REST, Casos de Uso e Domínio Limpo"]
+        API["API REST Spring Boot 3.4.x (Java 21 LTS)\nControladores REST, Segurança RBAC, Casos de Uso e Domínio Limpo"]
     end
 
     subgraph DatabaseContainer ["Contêiner de Banco de Dados"]
@@ -69,6 +70,10 @@ flowchart TD
         GlobalHandler["GlobalExceptionHandler\nRFC 7807 (ProblemDetail)"]
     end
 
+    subgraph SecurityLayer ["Camada de Segurança (com.ong.backend.infrastructure.config)"]
+        SecConfig["SecurityConfig\nFiltros RBAC (SECRETARIA vs AUDITOR)"]
+    end
+
     subgraph ApplicationLayer ["Camada de Aplicação (com.ong.backend.application)"]
         InPorts["Portas de Entrada (Use Cases)\nCriarDocumentoUseCase\nRegistrarNovaVersaoUseCase\nArquivarDocumentoUseCase\nBuscarDocumentosComFiltroUseCase\nConsultarHistoricoVersoesUseCase\nObterMetricasArquivoUseCase"]
         DocService["DocumentoService\nOrquestração de Casos de Uso e Transações"]
@@ -91,6 +96,8 @@ flowchart TD
         CorsCfg["CorsConfig\nConfiguração de origens cruzadas"]
     end
 
+    SecConfig --> DocController
+    SecConfig --> MetController
     DocController --> InPorts
     MetController --> InPorts
     DocController -.-> GlobalHandler
@@ -108,36 +115,100 @@ flowchart TD
 
 ---
 
-## 3. Divisão de Camadas e Regras de Dependência
+## 3. Fluxo de Versionamento e Arquivamento Documental
 
-A arquitetura garante que as dependências fluam **exclusivamente de fora para dentro**:
+O ciclo de vida de um documento é regido por regras estritas de integridade transacional e imutabilidade pós-arquivamento (**CA2** e **CA3**).
 
-```text
-com.ong.backend
-├── domain/                    # NÚCLEO: Pureza absoluta (Zero dependências externas)
-│   ├── exception/             # Exceções de negócio (DomainException, etc.)
-│   └── model/                 # Entidades, Value Objects e Enums ricos
-├── application/               # CASOS DE USO: Orquestração e contratos
-│   ├── port/
-│   │   ├── in/                # Interfaces de Use Cases, Commands e Queries
-│   │   └── out/               # Interface de persistência (DocumentoRepositoryPort)
-│   └── service/               # Implementação dos Use Cases com @Transactional
-├── infrastructure/            # ADAPTADORES DE SAÍDA: Tecnologias e Frameworks
-│   ├── config/                # WebMvcConfigurer (CORS)
-│   └── persistence/
-│       ├── adapter/           # DocumentoPersistenceAdapter (implementa a porta)
-│       ├── entity/            # Entidades relacionais JPA (DocumentoJpaEntity, etc.)
-│       ├── mapper/            # Mapeamento bidirecional Domínio <-> Entidade JPA
-│       └── repository/        # Repositórios Spring Data com JPA Specifications
-└── web/                       # ADAPTADORES DE ENTRADA: Protocolo HTTP REST
-    ├── controller/            # Controllers RESTful (@RestController)
-    ├── dto/                   # Records de request e response imutáveis
-    └── exception/             # GlobalExceptionHandler (@RestControllerAdvice com RFC 7807)
+### 3.1 Diagrama de Estados do Documento
+
+```mermaid
+stateDiagram-v2
+    [*] --> Vigente : POST /api/v1/documentos (versao = 1)
+    
+    state Vigente {
+        [*] --> Versao1
+        Versao1 --> VersaoN : POST /api/v1/documentos/{id}/versoes (incrementa versao_atual)
+        VersaoN --> VersaoN : Novas versões sequenciais com observação
+    }
+
+    Vigente --> Arquivado : PATCH /api/v1/documentos/{id}/arquivar
+    
+    state Arquivado {
+        [*] --> Imutavel : Status 'arquivado' permanente
+        Imutavel --> Bloqueio : Tentativa de registrar nova versão
+        Bloqueio --> [*] : Retorna HTTP 409 Conflict (CA3)
+    }
 ```
 
 ---
 
-## 4. Garantia Arquitetural Automatizada (ArchUnit)
+### 3.2 Diagrama de Sequência — Registro de Nova Versão (CA2)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Secretaria Administrativa
+    participant Controller as DocumentoController
+    participant Service as DocumentoService
+    participant Domain as Documento (Aggregate)
+    participant Repo as DocumentoPersistenceAdapter
+    participant DB as PostgreSQL 16
+
+    User->>Controller: POST /api/v1/documentos/1/versoes {"observacao": "Revisão cláusula 3"}
+    Controller->>Service: registrarNovaVersao(1, "Revisão...")
+    Service->>Repo: buscarPorIdComVersoes(1)
+    Repo->>DB: SELECT com JOIN FETCH versoes
+    DB-->>Repo: DocumentoJpaEntity
+    Repo-->>Service: Documento (Domain Aggregate)
+    Service->>Domain: registrarNovaVersao("Revisão...")
+    Note over Domain: Valida se status != ARQUIVADO<br/>Calcula proximoNumero = versaoAtual + 1<br/>Cria VersaoDocumento(numero, observacao)<br/>Atualiza versaoAtual = 2
+    Domain-->>Service: VersaoDocumento gerada
+    Service->>Repo: salvar(Documento)
+    Repo->>DB: INSERT INTO versoes + UPDATE documentos (Transação Única)
+    DB-->>Repo: Confirmado
+    Service-->>Controller: VersaoDocumento
+    Controller-->>User: HTTP 200 OK {"numero": 2, "observacao": "..."}
+```
+
+---
+
+### 3.3 Diagrama de Sequência — Tentativa de Versionamento em Documento Arquivado (CA3)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Secretaria Administrativa
+    participant Controller as DocumentoController
+    participant Service as DocumentoService
+    participant Domain as Documento (Aggregate)
+    participant Handler as GlobalExceptionHandler
+
+    User->>Controller: POST /api/v1/documentos/1/versoes {"observacao": "Tentativa indevida"}
+    Controller->>Service: registrarNovaVersao(1, "...")
+    Service->>Domain: registrarNovaVersao("...")
+    Note over Domain: Documento com status == ARQUIVADO!<br/>Lança DocumentoArquivadoException
+    Domain-->>Service: throw DocumentoArquivadoException(1)
+    Service-->>Controller: throw DocumentoArquivadoException(1)
+    Controller-->>Handler: intercepta DocumentoArquivadoException
+    Note over Handler: Monta RFC 7807 ProblemDetail<br/>status = 409 Conflict
+    Handler-->>User: HTTP 409 Conflict {"title": "Documento Arquivado", "detail": "..."}
+```
+
+---
+
+## 4. Segurança e Controle de Acesso Baseado em Papéis (RBAC)
+
+A API adota **Spring Security** com autenticação HTTP Basic e divisão de papéis (**Role-Based Access Control**):
+
+| Papel | Descrição | Endpoints Permitidos | Endpoints Bloqueados |
+| :--- | :--- | :--- | :--- |
+| **`ROLE_SECRETARIA`** | Secretaria Administrativa | `POST /api/v1/documentos`<br>`POST /api/v1/documentos/{id}/versoes`<br>`PATCH /api/v1/documentos/{id}/arquivar`<br>`GET /api/v1/**` | Nenhum (Acesso completo) |
+| **`ROLE_AUDITOR`** | Auditor / Conselho Fiscal | `GET /api/v1/documentos`<br>`GET /api/v1/documentos/{id}`<br>`GET /api/v1/documentos/{id}/versoes`<br>`GET /api/v1/metricas` | `POST /api/v1/documentos` (403 Forbidden)<br>`POST /api/v1/documentos/{id}/versoes` (403)<br>`PATCH /api/v1/documentos/{id}/arquivar` (403) |
+| **Anônimo** | Usuário não autenticado | Arquivos estáticos do frontend (`/`, `/index.html`, `/css/**`, `/js/**`) | Todos os endpoints `/api/v1/**` (401 Unauthorized) |
+
+---
+
+## 5. Garantia Arquitetural Automatizada (ArchUnit)
 
 Para garantir que violações de arquitetura não passem despercebidas em revisões manuais, o projeto conta com testes de conformidade arquitetural em tempo de compilação ([`ArchitectureTest.java`](file:///C:/Users/gisel/OneDrive/Documentos/Estudos/Senac/ONG%20AD/backend/src/test/java/com/ong/backend/architecture/ArchitectureTest.java)):
 
@@ -147,9 +218,9 @@ Para garantir que violações de arquitetura não passem despercebidas em revis�
 
 ---
 
-## 5. Modelo de Dados Relacional e Persistência
+## 6. Modelo de Dados Relacional e Persistência
 
-### 5.1 Diagrama Entidade-Relacionamento (ERD)
+### 6.1 Diagrama Entidade-Relacionamento (ERD)
 
 ```mermaid
 erDiagram
@@ -176,14 +247,14 @@ erDiagram
     }
 ```
 
-### 5.2 Integridade e Invariantes no Banco
+### 6.2 Integridade e Invariantes no Banco
 * **Restrição de Unicidade Composta:** `CONSTRAINT uk_documento_versao UNIQUE (documento_id, numero)`. Garante que sob nenhuma circunstância de concorrência duas versões com o mesmo número sejam geradas para o mesmo documento.
 * **Integridade Referencial:** Cascata na exclusão `ON DELETE CASCADE` da chave estrangeira.
 * **Migrações Declarativas:** Executadas na inicialização via **Flyway** (`V1__criar_tabelas_documentos_e_versoes.sql`). Nenhuma alteração de schema é feita via `ddl-auto=update`.
 
 ---
 
-## 6. Padronização de Erros REST (RFC 7807)
+## 7. Padronização de Erros REST (RFC 7807)
 
 Todas as falhas de validação, regras de negócio violadas e recursos inexistentes retornam uma estrutura padronizada da RFC 7807 através do [`GlobalExceptionHandler`](file:///C:/Users/gisel/OneDrive/Documentos/Estudos/Senac/ONG%20AD/backend/src/main/java/com/ong/backend/web/exception/GlobalExceptionHandler.java):
 
@@ -205,13 +276,15 @@ Todas as falhas de validação, regras de negócio violadas e recursos inexisten
 | :--- | :--- | :--- |
 | `TipoDocumentoInvalidoException` | `400 Bad Request` | Tipo fora do vocabulário homologado (**CA1**) |
 | `MethodArgumentNotValidException` | `400 Bad Request` | Violação de anotações Bean Validation |
+| `AuthenticationException` | `401 Unauthorized` | Credenciais ausentes ou inválidas (**SEC**) |
+| `AccessDeniedException` | `403 Forbidden` | Auditor tentando ação de escrita (**SEC**) |
 | `DocumentoNaoEncontradoException` | `404 Not Found` | Identificador do documento inexistente |
 | `DocumentoArquivadoException` | `409 Conflict` | Documento imutável bloqueia nova versão (**CA3**) |
 | `Exception` (inesperada) | `500 Internal Server Error` | Erros não mapeados com ocultação de stacktrace |
 
 ---
 
-## 7. Rastreabilidade com ADRs (Architectural Decision Records)
+## 8. Rastreabilidade com ADRs (Architectural Decision Records)
 
 Para o histórico completo de justificativas e alternativas consideradas nas decisões-chave, consulte:
 

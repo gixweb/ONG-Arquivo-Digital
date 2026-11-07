@@ -21,6 +21,13 @@
                 </div>
             </div>
             <div class="header-actions">
+                <div class="user-role-selector" title="Perfil de Acesso e Permissões (RBAC)">
+                    <label for="selectUserRole" class="role-label">Perfil Ativo (RBAC):</label>
+                    <select id="selectUserRole" class="role-select">
+                        <option value="secretaria">Secretaria (Escrita + Leitura)</option>
+                        <option value="auditor">Auditor (Somente Leitura)</option>
+                    </select>
+                </div>
                 <div class="connection-status" id="connectionStatus" title="Status da API REST">
                     <span class="status-dot online"></span>
                     <span class="status-text" id="apiStatusText">Conectado ao Backend</span>
@@ -98,12 +105,12 @@
 
                 <div class="form-group">
                     <label for="filterDataInicio">Data Início</label>
-                    <input type="date" id="filterDataInicio" name="dataInicio">
+                    <input type="date" id="filterDataInicio" name="dataInicio" title="Data inicial do intervalo de busca">
                 </div>
 
                 <div class="form-group">
                     <label for="filterDataFim">Data Fim</label>
-                    <input type="date" id="filterDataFim" name="dataFim">
+                    <input type="date" id="filterDataFim" name="dataFim" title="Data final do intervalo de busca">
                 </div>
 
                 <div class="form-group form-group-grow">
@@ -215,6 +222,7 @@
                         <div class="form-group">
                             <label for="novoDataDocumento">Data do Documento *</label>
                             <input type="date" id="novoDataDocumento" name="dataDocumento" required>
+                            <small class="form-hint">Data oficial de emissão ou assinatura.</small>
                         </div>
                     </div>
 

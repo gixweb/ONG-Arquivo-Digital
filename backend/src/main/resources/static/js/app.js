@@ -1,12 +1,25 @@
-﻿/**
+/**
  * Arquivo Digital — Console Web da Secretaria da ONG
- * Consome a API REST Spring Boot (v1)
+ * Consome a API REST Spring Boot (v1) com suporte a RBAC (Secretaria / Auditor)
  */
 
 const API_BASE_URL = window.API_BASE_URL || 
     (window.location.origin && window.location.origin.includes(':8080')
         ? `${window.location.origin}/api/v1`
         : 'http://localhost:8080/api/v1');
+
+// Credenciais ativas para autenticação HTTP Basic (RBAC)
+let currentAuth = {
+    username: 'secretaria',
+    password: 'secretaria123',
+    role: 'SECRETARIA'
+};
+
+function getAuthHeader() {
+    if (!currentAuth.username) return {};
+    const creds = btoa(`${currentAuth.username}:${currentAuth.password}`);
+    return { 'Authorization': `Basic ${creds}` };
+}
 
 // Estado global da aplicação
 const state = {
@@ -24,9 +37,10 @@ const state = {
 
 // Elementos DOM
 const elements = {
-    // Status
+    // Status e Perfil RBAC
     connectionStatus: document.getElementById('connectionStatus'),
     apiStatusText: document.getElementById('apiStatusText'),
+    selectUserRole: document.getElementById('selectUserRole'),
 
     // Métricas
     metricTotal: document.getElementById('metricTotal'),
@@ -97,6 +111,24 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupEventListeners() {
+    // Alternância de Perfil RBAC (Secretaria vs Auditor)
+    if (elements.selectUserRole) {
+        elements.selectUserRole.addEventListener('change', (e) => {
+            if (e.target.value === 'auditor') {
+                currentAuth = { username: 'auditor', password: 'auditor123', role: 'AUDITOR' };
+                elements.btnNovoDocumento.disabled = true;
+                elements.btnNovoDocumento.title = 'Perfil AUDITOR possui permissão estritamente somente leitura.';
+                mostrarToast('Perfil ativo: AUDITOR (Somente Leitura). Tentativas de escrita serão bloqueadas com 403 Forbidden.', 'warning');
+            } else {
+                currentAuth = { username: 'secretaria', password: 'secretaria123', role: 'SECRETARIA' };
+                elements.btnNovoDocumento.disabled = false;
+                elements.btnNovoDocumento.title = 'Cadastrar novo documento';
+                mostrarToast('Perfil ativo: SECRETARIA (Acesso completo a escrita e leitura).', 'success');
+            }
+            carregarTudo();
+        });
+    }
+
     // Filtros
     elements.filterForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -158,12 +190,15 @@ function setupEventListeners() {
         try {
             const resp = await fetch(`${API_BASE_URL}/documentos`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...getAuthHeader()
+                },
                 body: JSON.stringify(payload)
             });
 
             if (!resp.ok) {
-                const err = await resp.json().catch(() => ({ detail: 'Erro ao cadastrar documento.' }));
+                const err = await resp.json().catch(() => ({ detail: 'Erro HTTP ' + resp.status }));
                 throw new Error(err.detail || 'Falha ao salvar documento.');
             }
 
@@ -187,12 +222,15 @@ function setupEventListeners() {
         try {
             const resp = await fetch(`${API_BASE_URL}/documentos/${docId}/versoes`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...getAuthHeader()
+                },
                 body: JSON.stringify({ observacao })
             });
 
             if (!resp.ok) {
-                const err = await resp.json().catch(() => ({ detail: 'Erro ao registrar versão.' }));
+                const err = await resp.json().catch(() => ({ detail: 'Erro HTTP ' + resp.status }));
                 throw new Error(err.detail || 'Falha ao registrar versão.');
             }
 
@@ -211,11 +249,12 @@ function setupEventListeners() {
         const docId = elements.arquivarDocId.value;
         try {
             const resp = await fetch(`${API_BASE_URL}/documentos/${docId}/arquivar`, {
-                method: 'PATCH'
+                method: 'PATCH',
+                headers: { ...getAuthHeader() }
             });
 
             if (!resp.ok) {
-                const err = await resp.json().catch(() => ({ detail: 'Erro ao arquivar documento.' }));
+                const err = await resp.json().catch(() => ({ detail: 'Erro HTTP ' + resp.status }));
                 throw new Error(err.detail || 'Falha ao arquivar.');
             }
 
@@ -259,7 +298,9 @@ async function carregarTudo() {
 // Consulta de Métricas (RF06 / US06)
 async function carregarMetricas() {
     try {
-        const resp = await fetch(`${API_BASE_URL}/metricas`);
+        const resp = await fetch(`${API_BASE_URL}/metricas`, {
+            headers: { ...getAuthHeader() }
+        });
         if (!resp.ok) throw new Error('Falha ao obter métricas.');
         const data = await resp.json();
 
@@ -294,7 +335,9 @@ async function carregarDocumentos() {
     if (state.filters.titulo) params.append('titulo', state.filters.titulo);
 
     try {
-        const resp = await fetch(`${API_BASE_URL}/documentos?${params.toString()}`);
+        const resp = await fetch(`${API_BASE_URL}/documentos?${params.toString()}`, {
+            headers: { ...getAuthHeader() }
+        });
         if (!resp.ok) {
             const err = await resp.json().catch(() => ({ detail: 'Erro HTTP ' + resp.status }));
             throw new Error(err.detail || 'Falha ao recuperar documentos do servidor.');
@@ -303,12 +346,10 @@ async function carregarDocumentos() {
         const data = await resp.json();
         setBackendOnline(true);
 
-        state.totalPages = data.total_pages || 1;
-        state.totalElements = data.total_elements || 0;
-
         const docs = data.items || data.content || [];
         state.totalPages = data.total_pages || data.totalPages || 1;
         state.totalElements = data.total_elements ?? data.totalElements ?? docs.length;
+
         renderizarTabela(docs);
     } catch (err) {
         setBackendOnline(false);
@@ -326,6 +367,8 @@ function renderizarTabela(documentos) {
     }
 
     elements.documentsTableBody.innerHTML = '';
+    const isAuditor = (currentAuth.role === 'AUDITOR');
+
     documentos.forEach(doc => {
         const tr = document.createElement('tr');
         const isArquivado = doc.status === 'arquivado';
@@ -355,12 +398,12 @@ function renderizarTabela(documentos) {
                     </button>
                     <button type="button" class="btn btn-primary btn-sm" 
                             onclick="abrirNovaVersao(${doc.id}, '${escapeForAttr(doc.titulo)}', ${doc.versao_atual})"
-                            ${isArquivado ? 'disabled title="Documento arquivado é imutável (RF04 / CA3)"' : ''}>
+                            ${(isArquivado || isAuditor) ? 'disabled title="' + (isAuditor ? 'Auditor tem acesso somente leitura' : 'Documento arquivado é imutável (RF04 / CA3)') + '"' : ''}>
                         ➕ Versão
                     </button>
                     <button type="button" class="btn btn-danger btn-sm" 
                             onclick="abrirConfirmarArquivar(${doc.id}, '${escapeForAttr(doc.titulo)}')"
-                            ${isArquivado ? 'disabled title="Documento já está arquivado"' : ''}>
+                            ${(isArquivado || isAuditor) ? 'disabled title="' + (isAuditor ? 'Auditor tem acesso somente leitura' : 'Documento já está arquivado') + '"' : ''}>
                         🔒 Arquivar
                     </button>
                 </div>
@@ -381,7 +424,9 @@ window.abrirHistorico = async function(docId, docTitulo) {
     abrirModal(elements.modalHistorico);
 
     try {
-        const resp = await fetch(`${API_BASE_URL}/documentos/${docId}/versoes`);
+        const resp = await fetch(`${API_BASE_URL}/documentos/${docId}/versoes`, {
+            headers: { ...getAuthHeader() }
+        });
         if (!resp.ok) throw new Error('Não foi possível obter o histórico de versões.');
         const versoes = await resp.json();
 

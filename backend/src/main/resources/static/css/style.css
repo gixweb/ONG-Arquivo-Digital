@@ -1,4 +1,4 @@
-:root {
+﻿:root {
     --color-primary: #2563eb;
     --color-primary-hover: #1d4ed8;
     --color-primary-light: #eff6ff;
@@ -103,6 +103,32 @@ body {
     display: flex;
     align-items: center;
     gap: 1.25rem;
+}
+
+.user-role-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--color-gray-100);
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--radius-full);
+}
+
+.role-label {
+    font-size: 0.775rem;
+    font-weight: 600;
+    color: var(--color-gray-600);
+}
+
+.role-select {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-gray-300);
+    background: #ffffff;
+    color: var(--color-gray-900);
+    cursor: pointer;
 }
 
 .connection-status {
