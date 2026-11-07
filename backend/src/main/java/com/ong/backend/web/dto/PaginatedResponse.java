@@ -15,6 +15,11 @@ public record PaginatedResponse<T>(
         @JsonProperty("total_pages")
         int totalPages
 ) {
+    @JsonProperty("content")
+    public List<T> getContent() {
+        return items;
+    }
+
     public static <D, R> PaginatedResponse<R> fromDomain(PaginatedResult<D> result, Function<D, R> mapper) {
         List<R> items = result.content().stream().map(mapper).toList();
         return new PaginatedResponse<>(

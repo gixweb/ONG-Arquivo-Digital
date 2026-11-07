@@ -1,9 +1,12 @@
-/**
+﻿/**
  * Arquivo Digital — Console Web da Secretaria da ONG
  * Consome a API REST Spring Boot (v1)
  */
 
-const API_BASE_URL = window.API_BASE_URL || 'http://localhost:8080/api/v1';
+const API_BASE_URL = window.API_BASE_URL || 
+    (window.location.origin && window.location.origin.includes(':8080')
+        ? `${window.location.origin}/api/v1`
+        : 'http://localhost:8080/api/v1');
 
 // Estado global da aplicação
 const state = {
@@ -303,7 +306,10 @@ async function carregarDocumentos() {
         state.totalPages = data.total_pages || 1;
         state.totalElements = data.total_elements || 0;
 
-        renderizarTabela(data.content || []);
+        const docs = data.items || data.content || [];
+        state.totalPages = data.total_pages || data.totalPages || 1;
+        state.totalElements = data.total_elements ?? data.totalElements ?? docs.length;
+        renderizarTabela(docs);
     } catch (err) {
         setBackendOnline(false);
         mostrarEstado('error', err.message);
