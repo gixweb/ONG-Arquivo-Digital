@@ -4,9 +4,9 @@ services:
     container_name: ong_postgres
     restart: always
     environment:
-      POSTGRES_DB: ong_arquivo_digital
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-ong_arquivo_digital}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
