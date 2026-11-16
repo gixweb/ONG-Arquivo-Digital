@@ -1,11 +1,15 @@
 package com.ong.backend.infrastructure.security;
 
+import com.ong.backend.infrastructure.config.SecurityConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -14,6 +18,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,6 +49,16 @@ class SecurityIntegrationTest {
     @DisplayName("Anônimo tentando acessar API deve receber HTTP 401 Unauthorized (RFC 7807)")
     void anonymous_accessToApi_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/documentos"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status", is(401)))
+                .andExpect(jsonPath("$.title", is("Não Autenticado")));
+    }
+
+    @Test
+    @DisplayName("Credenciais incorretas devem retornar HTTP 401 Unauthorized (RFC 7807) [SEC-CRED]")
+    void invalidCredentials_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/documentos")
+                        .with(httpBasic("secretaria", "senha_invalida_999")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status", is(401)))
                 .andExpect(jsonPath("$.title", is("Não Autenticado")));
@@ -126,5 +141,25 @@ class SecurityIntegrationTest {
                 .andExpect(jsonPath("$.titulo", is("Ata de Posse da Secretaria")))
                 .andExpect(jsonPath("$.versao_atual", is(1)))
                 .andExpect(jsonPath("$.status", is("vigente")));
+    }
+
+    @Test
+    @DisplayName("UserDetailsService aceita credenciais externalizadas e senhas pré-criptografadas [SEC-CRED]")
+    void userDetailsService_supportsExternalizedAndPreHashedPasswords() {
+        PasswordEncoder encoder = context.getBean(PasswordEncoder.class);
+        SecurityConfig config = new SecurityConfig();
+        InMemoryUserDetailsManager manager = (InMemoryUserDetailsManager) config.userDetailsService(
+                encoder,
+                "secretaria_custom",
+                "{noop}senhaForte123",
+                "auditor_custom",
+                "{noop}senhaAuditor123"
+        );
+
+        UserDetails userSec = manager.loadUserByUsername("secretaria_custom");
+        assertEquals("{noop}senhaForte123", userSec.getPassword());
+
+        UserDetails userAud = manager.loadUserByUsername("auditor_custom");
+        assertEquals("{noop}senhaAuditor123", userAud.getPassword());
     }
 }

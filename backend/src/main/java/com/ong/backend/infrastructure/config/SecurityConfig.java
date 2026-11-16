@@ -1,6 +1,7 @@
 package com.ong.backend.infrastructure.config;
 
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -20,6 +21,11 @@ import org.springframework.security.web.SecurityFilterChain;
 
 import java.time.Instant;
 
+/**
+ * Configuração de segurança RBAC com autenticação HTTP Basic e tratamento RFC 7807 [SEC-CRED].
+ * Credenciais e usuários são externalizados via properties e variáveis de ambiente,
+ * suportando tanto texto puro quanto hashes criptográficos (ex: {bcrypt}...).
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -31,20 +37,33 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
+    public UserDetailsService userDetailsService(
+            PasswordEncoder passwordEncoder,
+            @Value("${security.secretaria.username:${SECURITY_SECRETARIA_USERNAME:secretaria}}") String secretariaUser,
+            @Value("${security.secretaria.password:${SECURITY_SECRETARIA_PASSWORD:secretaria123}}") String secretariaPass,
+            @Value("${security.auditor.username:${SECURITY_AUDITOR_USERNAME:auditor}}") String auditorUser,
+            @Value("${security.auditor.password:${SECURITY_AUDITOR_PASSWORD:auditor123}}") String auditorPass) {
+
         UserDetails secretaria = User.builder()
-                .username("secretaria")
-                .password(passwordEncoder.encode("secretaria123"))
+                .username(secretariaUser)
+                .password(formatPassword(passwordEncoder, secretariaPass))
                 .roles("SECRETARIA")
                 .build();
 
         UserDetails auditor = User.builder()
-                .username("auditor")
-                .password(passwordEncoder.encode("auditor123"))
+                .username(auditorUser)
+                .password(formatPassword(passwordEncoder, auditorPass))
                 .roles("AUDITOR")
                 .build();
 
         return new InMemoryUserDetailsManager(secretaria, auditor);
+    }
+
+    private String formatPassword(PasswordEncoder passwordEncoder, String rawOrEncoded) {
+        if (rawOrEncoded != null && rawOrEncoded.startsWith("{") && rawOrEncoded.contains("}")) {
+            return rawOrEncoded;
+        }
+        return passwordEncoder.encode(rawOrEncoded != null ? rawOrEncoded : "");
     }
 
     @Bean
