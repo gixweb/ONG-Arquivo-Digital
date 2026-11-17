@@ -8,15 +8,25 @@ const API_BASE_URL = window.API_BASE_URL ||
         ? `${window.location.origin}/api/v1`
         : 'http://localhost:8080/api/v1');
 
-// Credenciais ativas para autenticação HTTP Basic (RBAC)
-let currentAuth = {
-    username: 'secretaria',
-    password: 'secretaria123',
-    role: 'SECRETARIA'
-};
+// Gerenciamento de Sessão de Autenticação (RBAC) [SEC-CRED / SEC-LOGIN]
+// NENHUMA senha ou usuário fixo no código-fonte JavaScript.
+// Credenciais são lidas exclusivamente da sessão ativa do usuário (sessionStorage).
+function getStoredAuth() {
+    try {
+        const stored = sessionStorage.getItem('ong_auth');
+        if (stored) {
+            return JSON.parse(stored);
+        }
+    } catch (e) {
+        console.warn('Erro ao carregar sessão:', e);
+    }
+    return { username: '', password: '', role: '' };
+}
+
+let currentAuth = getStoredAuth();
 
 function getAuthHeader() {
-    if (!currentAuth.username) return {};
+    if (!currentAuth.username || !currentAuth.password) return {};
     const creds = btoa(`${currentAuth.username}:${currentAuth.password}`);
     return { 'Authorization': `Basic ${creds}` };
 }
@@ -37,10 +47,18 @@ const state = {
 
 // Elementos DOM
 const elements = {
-    // Status e Perfil RBAC
+    // Status e Autenticação RBAC [SEC-CRED / SEC-LOGIN]
     connectionStatus: document.getElementById('connectionStatus'),
     apiStatusText: document.getElementById('apiStatusText'),
-    selectUserRole: document.getElementById('selectUserRole'),
+    authBar: document.getElementById('authBar'),
+    authLoggedOut: document.getElementById('authLoggedOut'),
+    authLoggedIn: document.getElementById('authLoggedIn'),
+    inputUsername: document.getElementById('inputUsername'),
+    inputPassword: document.getElementById('inputPassword'),
+    btnEntrar: document.getElementById('btnEntrar'),
+    btnSair: document.getElementById('btnSair'),
+    authUserNameDisplay: document.getElementById('authUserNameDisplay'),
+    authUserRoleDisplay: document.getElementById('authUserRoleDisplay'),
 
     // Métricas
     metricTotal: document.getElementById('metricTotal'),
@@ -107,26 +125,27 @@ const elements = {
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
+    renderAuthUI();
     carregarTudo();
 });
 
 function setupEventListeners() {
-    // Alternância de Perfil RBAC (Secretaria vs Auditor)
-    if (elements.selectUserRole) {
-        elements.selectUserRole.addEventListener('change', (e) => {
-            if (e.target.value === 'auditor') {
-                currentAuth = { username: 'auditor', password: 'auditor123', role: 'AUDITOR' };
-                elements.btnNovoDocumento.disabled = true;
-                elements.btnNovoDocumento.title = 'Perfil AUDITOR possui permissão estritamente somente leitura.';
-                mostrarToast('Perfil ativo: AUDITOR (Somente Leitura). Tentativas de escrita serão bloqueadas com 403 Forbidden.', 'warning');
-            } else {
-                currentAuth = { username: 'secretaria', password: 'secretaria123', role: 'SECRETARIA' };
-                elements.btnNovoDocumento.disabled = false;
-                elements.btnNovoDocumento.title = 'Cadastrar novo documento';
-                mostrarToast('Perfil ativo: SECRETARIA (Acesso completo a escrita e leitura).', 'success');
-            }
-            carregarTudo();
+    // Autenticação RBAC dinâmica (sem credenciais fixas no JS)
+    if (elements.btnEntrar) {
+        elements.btnEntrar.addEventListener('click', handleLogin);
+    }
+    if (elements.inputPassword) {
+        elements.inputPassword.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') handleLogin();
         });
+    }
+    if (elements.inputUsername) {
+        elements.inputUsername.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') handleLogin();
+        });
+    }
+    if (elements.btnSair) {
+        elements.btnSair.addEventListener('click', handleLogout);
     }
 
     // Filtros
@@ -290,6 +309,94 @@ function setupEventListeners() {
     });
 }
 
+// Fluxo de Autenticação RBAC dinâmico [SEC-CRED / SEC-LOGIN]
+async function handleLogin() {
+    const username = elements.inputUsername.value.trim();
+    const password = elements.inputPassword.value;
+
+    if (!username || !password) {
+        mostrarToast('Informe o usuário e a senha para autenticar.', 'warning');
+        return;
+    }
+
+    try {
+        elements.btnEntrar.disabled = true;
+        elements.btnEntrar.textContent = 'Entrando...';
+
+        const testHeader = { 'Authorization': `Basic ${btoa(`${username}:${password}`)}` };
+        const resp = await fetch(`${API_BASE_URL}/metricas`, { headers: testHeader });
+
+        if (resp.status === 401 || resp.status === 403) {
+            mostrarToast('Credenciais inválidas. Verifique usuário e senha.', 'error');
+            elements.inputPassword.value = '';
+            elements.inputPassword.focus();
+            return;
+        }
+
+        if (!resp.ok) {
+            mostrarToast(`Erro ao autenticar: HTTP ${resp.status}`, 'error');
+            return;
+        }
+
+        const role = username.toLowerCase().includes('auditor') ? 'AUDITOR' : 'SECRETARIA';
+        currentAuth = { username, password, role };
+        try {
+            sessionStorage.setItem('ong_auth', JSON.stringify(currentAuth));
+        } catch (e) {
+            console.warn('Erro ao salvar em sessionStorage:', e);
+        }
+
+        renderAuthUI();
+        mostrarToast(`Autenticado com sucesso como ${username} (${role}).`, 'success');
+        carregarTudo();
+    } catch (err) {
+        mostrarToast(`Falha de conexão com a API: ${err.message}`, 'error');
+    } finally {
+        elements.btnEntrar.disabled = false;
+        elements.btnEntrar.textContent = 'Entrar';
+    }
+}
+
+function handleLogout() {
+    try {
+        sessionStorage.removeItem('ong_auth');
+    } catch (e) {
+        console.warn('Erro ao limpar sessionStorage:', e);
+    }
+    currentAuth = { username: '', password: '', role: '' };
+    if (elements.inputUsername) elements.inputUsername.value = '';
+    if (elements.inputPassword) elements.inputPassword.value = '';
+    renderAuthUI();
+    mostrarToast('Sessão encerrada com sucesso.', 'info');
+    carregarTudo();
+}
+
+function renderAuthUI() {
+    const isLoggedIn = !!(currentAuth.username && currentAuth.password);
+    if (elements.authLoggedOut && elements.authLoggedIn) {
+        if (isLoggedIn) {
+            elements.authLoggedOut.style.display = 'none';
+            elements.authLoggedIn.style.display = 'flex';
+            elements.authUserNameDisplay.textContent = currentAuth.username;
+            elements.authUserRoleDisplay.textContent = currentAuth.role;
+            if (currentAuth.role === 'AUDITOR') {
+                elements.authUserRoleDisplay.className = 'badge-role auditor';
+                elements.btnNovoDocumento.disabled = true;
+                elements.btnNovoDocumento.title = 'Perfil AUDITOR possui permissão estritamente somente leitura.';
+            } else {
+                elements.authUserRoleDisplay.className = 'badge-role';
+                elements.btnNovoDocumento.disabled = false;
+                elements.btnNovoDocumento.title = 'Cadastrar novo documento';
+            }
+        } else {
+            elements.authLoggedOut.style.display = 'flex';
+            elements.authLoggedIn.style.display = 'none';
+            elements.btnNovoDocumento.disabled = true;
+            elements.btnNovoDocumento.title = 'Faça login na barra superior para cadastrar documentos.';
+        }
+    }
+}
+
 // Carregamento Integrado
 async function carregarTudo() {
     await Promise.all([carregarMetricas(), carregarDocumentos()]);
@@ -297,6 +404,16 @@ async function carregarTudo() {
 
 // Consulta de Métricas (RF06 / US06)
 async function carregarMetricas() {
+    if (!currentAuth.username || !currentAuth.password) {
+        elements.metricTotal.textContent = '—';
+        elements.metricVigentes.textContent = '—';
+        elements.metricArquivados.textContent = '—';
+        elements.tipoAta.textContent = '—';
+        elements.tipoContrato.textContent = '—';
+        elements.tipoRelatorio.textContent = '—';
+        elements.tipoOficio.textContent = '—';
+        return;
+    }
     try {
         const resp = await fetch(`${API_BASE_URL}/metricas`, {
             headers: { ...getAuthHeader() }
@@ -322,6 +439,13 @@ async function carregarMetricas() {
 
 // Consulta de Documentos com Filtros e Paginação (RF02 / CA4)
 async function carregarDocumentos() {
+    if (!currentAuth.username || !currentAuth.password) {
+        mostrarEstado('empty');
+        elements.resultsCount.textContent = 'Faça login na barra superior para consultar documentos';
+        elements.paginationBar.classList.add('hidden');
+        return;
+    }
+
     mostrarEstado('loading');
 
     const params = new URLSearchParams({

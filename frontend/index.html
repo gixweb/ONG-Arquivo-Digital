@@ -21,12 +21,18 @@
                 </div>
             </div>
             <div class="header-actions">
-                <div class="user-role-selector" title="Perfil de Acesso e Permissões (RBAC)">
-                    <label for="selectUserRole" class="role-label">Perfil Ativo (RBAC):</label>
-                    <select id="selectUserRole" class="role-select">
-                        <option value="secretaria">Secretaria (Escrita + Leitura)</option>
-                        <option value="auditor">Auditor (Somente Leitura)</option>
-                    </select>
+                <div class="auth-bar" id="authBar" title="Autenticação e Perfil de Acesso (RBAC)">
+                    <div id="authLoggedOut" class="auth-form-inline">
+                        <input type="text" id="inputUsername" placeholder="Usuário (secretaria/auditor)" class="auth-input" autocomplete="username">
+                        <input type="password" id="inputPassword" placeholder="Senha" class="auth-input" autocomplete="current-password">
+                        <button id="btnEntrar" type="button" class="btn btn-sm btn-primary">Entrar</button>
+                    </div>
+                    <div id="authLoggedIn" class="auth-user-badge" style="display: none;">
+                        <span class="user-icon">👤</span>
+                        <span id="authUserNameDisplay" class="user-name"></span>
+                        <span id="authUserRoleDisplay" class="badge-role"></span>
+                        <button id="btnSair" type="button" class="btn btn-sm btn-outline">Sair</button>
+                    </div>
                 </div>
                 <div class="connection-status" id="connectionStatus" title="Status da API REST">
                     <span class="status-dot online"></span>
