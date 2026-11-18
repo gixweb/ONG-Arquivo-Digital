@@ -1,7 +1,7 @@
 # Arquivo Digital da ONG (ONG-Arquivo-Digital)
 
 [![Versão](https://img.shields.io/badge/versão-v1.0.0-blue.svg)](https://github.com/gixweb/ONG-Arquivo-Digital/releases)
-[![Build & Test](https://img.shields.io/badge/testes-87%20passando%20%7C%200%20falhas-brightgreen.svg)](https://github.com/gixweb/ONG-Arquivo-Digital/actions)
+[![Build & Test](https://img.shields.io/badge/testes-90%20passando%20%7C%200%20falhas-brightgreen.svg)](https://github.com/gixweb/ONG-Arquivo-Digital/actions)
 [![Cobertura JaCoCo](https://img.shields.io/badge/cobertura-%E2%89%A580%25%20linhas%20%7C%20%E2%89%A565%25%20branches-brightgreen.svg)](https://github.com/gixweb/ONG-Arquivo-Digital)
 [![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-green.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-21%20LTS-red.svg)](https://www.oracle.com/java/)
@@ -178,19 +178,26 @@ $env:SPRING_PROFILES_ACTIVE="prod"
 .\mvnw.cmd spring-boot:run
 ```
 
-### 6.3 Executando os Testes Automatizados (87 Testes)
+### 6.3 Executando os Testes Automatizados (90 Testes)
 ```powershell
 cd backend
 .\mvnw.cmd test
 ```
 
 ### 6.4 Perfis de Acesso e Credenciais (RBAC)
-A API RESTful é protegida com Spring Security via HTTP Basic Authentication e respostas de erro estruturadas segundo a RFC 7807 (`ProblemDetail`):
+A API RESTful é protegida com Spring Security via HTTP Basic Authentication e respostas de erro estruturadas segundo a RFC 7807 (`ProblemDetail`). Em conformidade com as boas práticas de segurança (`[SEC-CRED]`), **nenhuma senha é fixada no código-fonte ou no JavaScript do cliente**:
 
-| Perfil | Usuário | Senha | Permissões |
-| :--- | :--- | :--- | :--- |
-| **Secretaria** | `secretaria` | `secretaria123` | Permissão total: cadastro (`POST`), versionamento (`POST`), arquivamento (`PATCH`) e consultas (`GET`). |
-| **Auditor** | `auditor` | `auditor123` | Somente leitura: apenas consultas (`GET`). Qualquer tentativa de escrita retorna `403 Forbidden`. |
+* **Variáveis de Ambiente (Backend):**
+  * `SECURITY_SECRETARIA_USERNAME` / `SECURITY_SECRETARIA_PASSWORD` (padrão local de dev: `secretaria` / `secretaria123`)
+  * `SECURITY_AUDITOR_USERNAME` / `SECURITY_AUDITOR_PASSWORD` (padrão local de dev: `auditor` / `auditor123`)
+  * Suporta senhas em texto puro ou hashes criptográficos pre-encoded (ex: `{bcrypt}...`).
+* **Console Web (Frontend):**
+  * O usuário insere suas credenciais na barra de autenticação do cabeçalho; os dados são armazenados exclusivamente na sessão temporária do navegador (`sessionStorage`), sem senhas gravadas no código.
+
+| Perfil | Usuário Padrão (Dev) | Permissões |
+| :--- | :--- | :--- |
+| **Secretaria** | `secretaria` | Permissão total: cadastro (`POST`), versionamento (`POST`), arquivamento (`PATCH`) e consultas (`GET`). |
+| **Auditor** | `auditor` | Somente leitura: apenas consultas (`GET`). Qualquer tentativa de escrita retorna `403 Forbidden`. |
 
 ### 6.5 Executando o Frontend Console
 O front-end já está integrado diretamente no Spring Boot e pode ser acessado em:
@@ -223,4 +230,4 @@ Adotamos o modelo de **Git Flow** com branches temáticas associadas às 15 issu
 ---
 
 ## 8. Licença
-Este projeto está sob a licença [MIT](LICENSE).
+Este projeto está sob a licença [MIT](LICENSE) — Copyright (c) 2026 Giselly Luiza Rocha de Lima.
